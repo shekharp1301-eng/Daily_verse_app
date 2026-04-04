@@ -243,91 +243,125 @@ def user_to_profile(user: dict, streak: int) -> UserProfile:
     )
 
 
-def fallback_verse(date_str: str, language: str) -> dict:
-    if language == "te":
-        return {
+def fallback_bilingual_verse(_: str) -> dict:
+    return {
+        "reference": "2 Timothy 1:7",
+        "image_hint": "sunrise mountains",
+        "en": {
+            "verse_text": "For God gave us not a spirit of fear, but of power and love and self-control.",
+            "theme": "Courage",
+            "explanation": "This verse reminds you that fear does not define your day. God equips you with strength and calm clarity.",
+            "message": "Replace one fear with one faithful action today.",
+            "prayer": "Lord, fill my heart with courage, peace, and disciplined love today.",
+        },
+        "te": {
             "verse_text": "దేవుడు మనకు భయమునకు కాదు, శక్తి, ప్రేమ, స్వస్థత కల మనస్సు ఇచ్చెను.",
-            "reference": "2 తిమోతికి 1:7",
             "theme": "ధైర్యం",
             "explanation": "ఈ వాక్యము నేడు నీ హృదయములో ధైర్యాన్ని నింపుతుంది. భయం కన్నా దేవుని ప్రేమ బలమైనది.",
             "message": "ఈ రోజు ఒక భయాన్ని విశ్వాసంతో మార్చు.",
             "prayer": "ప్రభువా, నా భయాలను తొలగించి నీ శాంతితో నన్ను నింపుము.",
-            "image_hint": "sunrise-mountains",
-        }
-    return {
-        "verse_text": "For God gave us not a spirit of fear, but of power and love and self-control.",
-        "reference": "2 Timothy 1:7",
-        "theme": "Courage",
-        "explanation": "This verse reminds you that fear does not define your day. God equips you with strength and calm clarity.",
-        "message": "Replace one fear with one faithful action today.",
-        "prayer": "Lord, fill my heart with courage, peace, and disciplined love today.",
-        "image_hint": "sunrise-mountains",
+        },
     }
 
 
-async def generate_verse_with_ai(date_str: str, language: str) -> dict:
-    if not EMERGENT_LLM_KEY or LlmChat is None or UserMessage is None:
-        return fallback_verse(date_str, language)
+def is_valid_bilingual_payload(payload: dict) -> bool:
+    if not payload:
+        return False
+    top_keys = {"reference", "image_hint", "en", "te"}
+    if not top_keys.issubset(set(payload.keys())):
+        return False
 
-    target_language = "Telugu" if language == "te" else "English"
+    child_keys = {"verse_text", "theme", "explanation", "message", "prayer"}
+    for language in ("en", "te"):
+        item = payload.get(language, {})
+        if not isinstance(item, dict):
+            return False
+        if not child_keys.issubset(set(item.keys())):
+            return False
+    return True
+
+
+async def generate_bilingual_verse_with_ai(date_str: str) -> dict:
+    if not EMERGENT_LLM_KEY or LlmChat is None or UserMessage is None:
+        return fallback_bilingual_verse(date_str)
+
     system_prompt = (
-        "You are a Christian devotional assistant. Return ONLY strict JSON with keys: "
-        "verse_text, reference, theme, explanation, message, prayer, image_hint."
+        "You are a Christian devotional assistant. Return ONLY strict JSON with this schema: "
+        "{reference:string,image_hint:string,en:{verse_text,theme,explanation,message,prayer},"
+        "te:{verse_text,theme,explanation,message,prayer}}."
     )
     user_prompt = (
-        f"Generate today's devotional verse for date {date_str} in {target_language}. "
-        "Use Bible-faithful tone, compassionate language, and concise sections. "
-        "explanation max 45 words, message max 20 words, prayer max 24 words. "
-        "image_hint should be two words like 'sunrise mountains'."
+        f"Generate one devotional for date {date_str}. English and Telugu must be the SAME scripture meaning and same Bible reference. "
+        "Keep explanation <=45 words, message <=20 words, prayer <=24 words for each language. "
+        "Use clean Telugu script for te. image_hint should be two words like 'sunrise mountains'."
     )
 
     try:
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
-            session_id=f"daily-verse-{date_str}-{language}",
+            session_id=f"daily-verse-bilingual-{date_str}",
             system_message=system_prompt,
         ).with_model("openai", "gpt-5.2")
         response = await chat.send_message(UserMessage(text=user_prompt))
         parsed = extract_json_payload(response)
-        required_keys = {
-            "verse_text",
-            "reference",
-            "theme",
-            "explanation",
-            "message",
-            "prayer",
-            "image_hint",
-        }
-        if not parsed or not required_keys.issubset(set(parsed.keys())):
-            return fallback_verse(date_str, language)
+        if not is_valid_bilingual_payload(parsed):
+            return fallback_bilingual_verse(date_str)
         return parsed
     except Exception:
-        return fallback_verse(date_str, language)
+        return fallback_bilingual_verse(date_str)
 
 
-async def get_or_generate_verse(date_str: str, language: str) -> dict:
-    existing = await db.verses.find_one(
-        {"verse_date": date_str, "language": language}, {"_id": 0}
-    )
-    if existing:
-        return existing
-
-    generated = await generate_verse_with_ai(date_str, language)
-    verse_doc = {
+def bundle_to_verse_doc(date_str: str, pair_id: str, language: Literal["en", "te"], bundle: dict, created_at: str) -> dict:
+    item = bundle[language]
+    return {
         "id": str(uuid.uuid4()),
+        "verse_pair_id": pair_id,
         "verse_date": date_str,
         "language": language,
-        "verse_text": generated["verse_text"],
-        "reference": generated["reference"],
-        "theme": generated["theme"],
-        "explanation": generated["explanation"],
-        "message": generated["message"],
-        "prayer": generated["prayer"],
-        "image_hint": generated["image_hint"],
-        "created_at": utc_now_iso(),
+        "verse_text": item["verse_text"],
+        "reference": bundle["reference"],
+        "theme": item["theme"],
+        "explanation": item["explanation"],
+        "message": item["message"],
+        "prayer": item["prayer"],
+        "image_hint": bundle["image_hint"],
+        "created_at": created_at,
     }
-    await db.verses.insert_one(verse_doc.copy())
-    return verse_doc
+
+
+async def create_bilingual_pair(date_str: str) -> dict:
+    bundle = await generate_bilingual_verse_with_ai(date_str)
+    pair_id = str(uuid.uuid4())
+    created_at = utc_now_iso()
+
+    en_doc = bundle_to_verse_doc(date_str, pair_id, "en", bundle, created_at)
+    te_doc = bundle_to_verse_doc(date_str, pair_id, "te", bundle, created_at)
+    await db.verses.insert_many([en_doc.copy(), te_doc.copy()])
+    return {"en": en_doc, "te": te_doc}
+
+
+async def get_or_generate_verse(date_str: str, language: Literal["en", "te"]) -> dict:
+    latest = await db.verses.find_one(
+        {"verse_date": date_str},
+        {"_id": 0, "verse_pair_id": 1},
+        sort=[("created_at", -1)],
+    )
+
+    if latest:
+        pair_id = latest.get("verse_pair_id")
+        if pair_id:
+            existing = await db.verses.find_one(
+                {"verse_date": date_str, "verse_pair_id": pair_id, "language": language},
+                {"_id": 0},
+            )
+            if existing:
+                return existing
+        else:
+            # legacy non-paired data cleanup for strict bilingual consistency
+            await db.verses.delete_many({"verse_date": date_str})
+
+    created = await create_bilingual_pair(date_str)
+    return created[language]
 
 
 async def send_expo_push(tokens: list[str], title: str, body: str, data: dict) -> int:
@@ -489,21 +523,8 @@ async def verse_by_id(verse_id: str, current_user: dict = Depends(get_current_us
 @api_router.post("/verse/refresh", response_model=VerseCard)
 async def refresh_verse(payload: RefreshVerseRequest, current_user: dict = Depends(get_current_user)):
     date_str = datetime.now(timezone.utc).date().isoformat()
-    generated = await generate_verse_with_ai(date_str, payload.language)
-    verse_doc = {
-        "id": str(uuid.uuid4()),
-        "verse_date": date_str,
-        "language": payload.language,
-        "verse_text": generated["verse_text"],
-        "reference": generated["reference"],
-        "theme": generated["theme"],
-        "explanation": generated["explanation"],
-        "message": generated["message"],
-        "prayer": generated["prayer"],
-        "image_hint": generated["image_hint"],
-        "created_at": utc_now_iso(),
-    }
-    await db.verses.insert_one(verse_doc.copy())
+    pair = await create_bilingual_pair(date_str)
+    verse_doc = pair[payload.language]
     return VerseCard(**{**verse_doc, "is_favorite": False})
 
 
@@ -515,21 +536,37 @@ async def history(
 ):
     items = await db.verses.find(
         {"language": language},
-        {"_id": 0, "id": 1, "verse_date": 1, "verse_text": 1, "reference": 1, "theme": 1, "language": 1},
-    ).sort("verse_date", -1).to_list(max(1, min(limit, 90)))
+        {
+            "_id": 0,
+            "id": 1,
+            "verse_date": 1,
+            "verse_text": 1,
+            "reference": 1,
+            "theme": 1,
+            "language": 1,
+            "created_at": 1,
+        },
+    ).sort([("verse_date", -1), ("created_at", -1)]).to_list(300)
 
     response = []
+    seen_dates = set()
     for item in items:
+        verse_date = item["verse_date"]
+        if verse_date in seen_dates:
+            continue
+        seen_dates.add(verse_date)
         response.append(
             VerseHistoryItem(
                 id=item["id"],
-                verse_date=item["verse_date"],
+                verse_date=verse_date,
                 language=item["language"],
                 verse_preview=item["verse_text"][:90],
                 reference=item["reference"],
                 theme=item["theme"],
             )
         )
+        if len(response) >= max(1, min(limit, 90)):
+            break
     return response
 
 
