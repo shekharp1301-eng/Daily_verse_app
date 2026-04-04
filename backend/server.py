@@ -49,13 +49,13 @@ api_router = APIRouter(prefix="/api")
 
 class UserCreate(BaseModel):
     name: str = Field(min_length=2, max_length=80)
-    email: EmailStr
+    email: str
     password: str = Field(min_length=8, max_length=120)
 
 
 class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
+    email: str = ""
+    password: str = ""
 
 
 class UserProfile(BaseModel):
@@ -160,6 +160,10 @@ def create_access_token(user_id: str, email: str) -> str:
 
 def validate_notification_time(notification_time: str) -> bool:
     return bool(re.match(r"^(?:[01]\d|2[0-3]):[0-5]\d$", notification_time))
+
+
+def is_valid_email(email: str) -> bool:
+    return bool(re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email))
 
 
 def extract_json_payload(raw_text: str) -> dict:
@@ -454,7 +458,10 @@ async def root():
 
 @api_router.post("/auth/signup", response_model=TokenResponse)
 async def signup(payload: UserCreate):
-    email = payload.email.lower()
+    email = payload.email.strip().lower()
+    if not is_valid_email(email):
+        raise HTTPException(status_code=400, detail="Enter a valid email address")
+
     exists = await db.users.find_one({"email": email}, {"_id": 0, "id": 1})
     if exists:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -482,7 +489,10 @@ async def signup(payload: UserCreate):
 
 @api_router.post("/auth/login", response_model=TokenResponse)
 async def login(payload: UserLogin):
-    email = payload.email.lower()
+    email = payload.email.strip().lower()
+    if not is_valid_email(email):
+        raise HTTPException(status_code=400, detail="Enter a valid email address")
+
     user = await db.users.find_one({"email": email}, {"_id": 0})
     if not user or not verify_password(payload.password, user.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="Invalid credentials")

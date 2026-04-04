@@ -52,6 +52,13 @@ Build a clean, modern, spiritual mobile app that delivers a daily God’s Word e
 - Backend now generates and stores bilingual pairs (`verse_pair_id`) together, and language toggle returns translated content from the same daily pair.
 - Reset old verse data per request: cleared historical `verses`, `favorites`, and `read_logs` so all new records follow bilingual pairing rule.
 
+### 2026-04-04 (Auth Stability Update)
+- Fixed intermittent login failures by improving auth input handling:
+  - Frontend now validates email/password before sending login/signup requests.
+  - Frontend now formats FastAPI error arrays into readable messages.
+  - Backend login now returns clear `400` message for invalid/blank email instead of noisy validation failures.
+- Re-tested login via API and preview flow with demo credentials successfully.
+
 ## Remaining Backlog
 ### P0 (Must complete next)
 - Harden Expo preview stability under intermittent tunnel conditions (operational reliability).

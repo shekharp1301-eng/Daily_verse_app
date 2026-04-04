@@ -126,6 +126,14 @@ export default function Index() {
     try {
       setAuthBusy(true);
       setError("");
+      if (!email || !password) {
+        setError("Please enter email and password.");
+        return;
+      }
+      if (!/^\S+@\S+\.\S+$/.test(email)) {
+        setError("Please enter a valid email address.");
+        return;
+      }
       const data = await api.login(email, password);
       await handleAuthResponse(data.access_token);
     } catch (authError) {
@@ -139,6 +147,18 @@ export default function Index() {
     try {
       setAuthBusy(true);
       setError("");
+      if (!name || !email || !password) {
+        setError("Please fill name, email, and password.");
+        return;
+      }
+      if (!/^\S+@\S+\.\S+$/.test(email)) {
+        setError("Please enter a valid email address.");
+        return;
+      }
+      if (password.length < 8) {
+        setError("Password must be at least 8 characters.");
+        return;
+      }
       const data = await api.signup(name, email, password);
       await handleAuthResponse(data.access_token);
     } catch (authError) {
