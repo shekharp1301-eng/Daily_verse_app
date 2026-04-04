@@ -1,0 +1,70 @@
+{
+  "summary": "Backend API regression passed on public endpoint; frontend mobile web is intermittently unstable due Expo tunnel/Metro bundle disconnects, blocking reliable end-to-end UI validation.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Auth/Home transition on Expo web preview",
+        "issue": "Intermittent blank/splash/login-only rendering due failed bundle fetch (502) and Metro disconnect during interaction.",
+        "testID": "N/A",
+        "priority": "CRITICAL"
+      },
+      {
+        "component": "Interactive elements across auth/home/settings",
+        "issue": "Missing testID attributes on buttons/inputs/tabs makes RN web automation brittle and hard to stabilize.",
+        "testID": "missing",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Login -> Home -> tab/actions",
+        "issue": "Flow works intermittently, but repeated runs disconnect from Metro and revert to auth/blank state mid-test.",
+        "affected_testIDs": []
+      }
+    ],
+    "design_issues": [],
+    "react_native_issues": [
+      {
+        "component": "expo-router route discovery",
+        "issue": "Console repeatedly warns that non-route files inside app/ are treated as routes; constants/images route warning persists."
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/conftest.py",
+    "/app/backend/tests/test_daily_verse_api.py",
+    "/app/test_reports/pytest/pytest_results.xml",
+    "/app/test_reports/frontend_smoke.png",
+    "/app/test_reports/frontend_login_retry.png"
+  ],
+  "action_items": [
+    "Stabilize Expo tunnel/Metro web preview availability (bundle endpoint currently returns intermittent 502 / disconnect).",
+    "Move non-route helper files out of app/ routes scope or make them private route-safe files to eliminate expo-router route conflicts.",
+    "Add testID to all interactive RN elements (auth inputs/buttons, language toggle, tabs, action buttons, settings controls).",
+    "After frontend stabilization, re-run full UI regression for refresh/favorites/history/settings/push flows."
+  ],
+  "critical_code_review_comments": [
+    "server.py uses fallback JWT secret (JWT_SECRET default string) which is unsafe if env is missing.",
+    "Frontend API base URL source differs from required EXPO_BACKEND_URL convention; currently depends on EXPO_PUBLIC_BACKEND_URL/extra.backendUrl.",
+    "Expo-router warnings indicate architecture smell: many non-route files are located under app/ and discovered as routes."
+  ],
+  "updated_files": [
+    "/app/frontend/app/constants/images.ts",
+    "/app/backend/tests/conftest.py",
+    "/app/backend/tests/test_daily_verse_api.py",
+    "/app/test_reports/iteration_1.json"
+  ],
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "35%"
+  },
+  "seed_data_creation": "Created 1 TEST_ signup user via /api/auth/signup during pytest run.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Use public URL only. Login with text selector worked once and reached home, but repeated runs dropped Metro connection. Backend endpoints are healthy and passed full pytest suite.",
+  "rca_of_issue": "Primary blocker is preview infrastructure instability: bundle URL for expo-router intermittently returns 502 with MIME mismatch and Metro disconnect (1006), causing blank or auth-only UI and preventing deterministic selector execution. Secondary issue is expo-router route pollution from non-route files in app/."
+}
