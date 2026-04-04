@@ -27,6 +27,13 @@ Notifications.setNotificationHandler({
 });
 
 const AUTH_TOKEN_KEY = "daily-verse-token";
+const DEFAULT_SETTINGS: SettingsPayload = {
+  default_language: "en",
+  notification_time: "06:00",
+  theme: "light",
+  timezone: "UTC",
+  notification_enabled: true,
+};
 
 export default function Index() {
   const [showSplash, setShowSplash] = useState(true);
@@ -37,11 +44,7 @@ export default function Index() {
   const [history, setHistory] = useState<VerseHistoryItem[]>([]);
   const [favorites, setFavorites] = useState<VerseCardData[]>([]);
   const [settings, setSettings] = useState<SettingsPayload>({
-    default_language: "en",
-    notification_time: "06:00",
-    theme: "light",
-    timezone: "UTC",
-    notification_enabled: true,
+    ...DEFAULT_SETTINGS,
   });
   const [activeTab, setActiveTab] = useState<TabKey>("home");
   const [busy, setBusy] = useState(false);
@@ -64,12 +67,17 @@ export default function Index() {
 
       const profile = await api.me();
       const lang = profile.default_language;
-      const [today, historyRows, favoriteRows, profileSettings] = await Promise.all([
-        api.todayVerse(lang),
+      const today = await api.todayVerse(lang);
+
+      const [historyResult, favoritesResult, settingsResult] = await Promise.allSettled([
         api.history(lang),
         api.favorites(lang),
         api.settings(),
       ]);
+
+      const historyRows = historyResult.status === "fulfilled" ? historyResult.value : [];
+      const favoriteRows = favoritesResult.status === "fulfilled" ? favoritesResult.value : [];
+      const profileSettings = settingsResult.status === "fulfilled" ? settingsResult.value : DEFAULT_SETTINGS;
 
       setUser(profile);
       setLanguage(lang);
@@ -78,8 +86,16 @@ export default function Index() {
       setFavorites(favoriteRows);
       setSettings(profileSettings);
 
-      await api.markReading(today.id, today.verse_date);
-      await registerPushToken();
+      try {
+        await api.markReading(today.id, today.verse_date);
+      } catch (markError) {
+        console.warn("Reading mark skipped:", markError);
+      }
+      try {
+        await registerPushToken();
+      } catch (pushError) {
+        console.warn("Push registration skipped:", pushError);
+      }
     } catch {
       await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
       setAuthToken("");
@@ -101,19 +117,23 @@ export default function Index() {
   }, [loadSession]);
 
   const registerPushToken = async () => {
-    if (!Device.isDevice) return;
-    const permission = await Notifications.getPermissionsAsync();
-    let finalStatus = permission.status;
+    try {
+      if (!Device.isDevice) return;
+      const permission = await Notifications.getPermissionsAsync();
+      let finalStatus = permission.status;
 
-    if (finalStatus !== "granted") {
-      const requested = await Notifications.requestPermissionsAsync();
-      finalStatus = requested.status;
-    }
-    if (finalStatus !== "granted") return;
+      if (finalStatus !== "granted") {
+        const requested = await Notifications.requestPermissionsAsync();
+        finalStatus = requested.status;
+      }
+      if (finalStatus !== "granted") return;
 
-    const pushToken = await Notifications.getExpoPushTokenAsync();
-    if (pushToken.data) {
-      await api.registerPushToken(pushToken.data);
+      const pushToken = await Notifications.getExpoPushTokenAsync();
+      if (pushToken.data) {
+        await api.registerPushToken(pushToken.data);
+      }
+    } catch (error) {
+      console.warn("Push token registration failed:", error);
     }
   };
 
