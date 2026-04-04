@@ -19,6 +19,7 @@ export function HistoryScreen({ language, items, onOpen }: Props) {
       ) : (
         items.map((item) => (
           <Pressable
+            testID={`history-item-${item.id}`}
             key={item.id}
             onPress={() => onOpen(item.id)}
             style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}

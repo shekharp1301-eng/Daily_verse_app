@@ -57,6 +57,7 @@ export function HomeScreen({
               const active = language === item;
               return (
                 <Pressable
+                  testID={`language-toggle-${item}`}
                   key={item}
                   onPress={() => onLanguageChange(item)}
                   style={[styles.togglePill, active && styles.toggleActive]}
@@ -66,7 +67,7 @@ export function HomeScreen({
               );
             })}
           </View>
-          <Pressable onPress={onOpenSettings} style={styles.settingsBtn}>
+          <Pressable testID="open-settings-button" onPress={onOpenSettings} style={styles.settingsBtn}>
             <Ionicons name="settings-outline" size={20} color="#1F3C63" />
           </Pressable>
         </View>
@@ -86,9 +87,16 @@ export function HomeScreen({
               icon={verse.is_favorite ? "heart" : "heart-outline"}
               onPress={onFavorite}
               active={verse.is_favorite}
+              testID="home-favorite-button"
             />
-            <CircleAction label={copy.share} icon="share-social-outline" onPress={onShare} />
-            <CircleAction label={copy.refresh} icon="refresh-outline" onPress={onRefresh} loading={isRefreshing} />
+            <CircleAction label={copy.share} icon="share-social-outline" onPress={onShare} testID="home-share-button" />
+            <CircleAction
+              label={copy.refresh}
+              icon="refresh-outline"
+              onPress={onRefresh}
+              loading={isRefreshing}
+              testID="home-refresh-button"
+            />
           </View>
         </>
       ) : (
@@ -127,17 +135,20 @@ function CircleAction({
   onPress,
   loading,
   active,
+  testID,
 }: {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void | Promise<void>;
   loading?: boolean;
   active?: boolean;
+  testID?: string;
 }) {
   return (
     <Pressable
       onPress={() => void onPress()}
       disabled={loading}
+      testID={testID}
       style={({ pressed }) => [styles.actionBtn, active && styles.actionBtnActive, pressed && styles.actionPressed]}
     >
       <Ionicons name={icon} size={20} color={active ? "#9A202F" : "#2D4264"} />

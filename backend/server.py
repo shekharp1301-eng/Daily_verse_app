@@ -33,7 +33,9 @@ mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ["DB_NAME"]]
 
-JWT_SECRET = os.getenv("JWT_SECRET", "daily-verse-super-secret")
+JWT_SECRET = os.getenv("JWT_SECRET")
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET is required in environment")
 JWT_ALGORITHM = "HS256"
 TOKEN_EXPIRY_MINUTES = 60 * 24 * 7
 EMERGENT_LLM_KEY = os.getenv("EMERGENT_LLM_KEY", "")

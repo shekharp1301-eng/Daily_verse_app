@@ -23,14 +23,14 @@ export function FavoritesScreen({ language, items, onOpen, onRemove }: Props) {
       ) : (
         items.map((item) => (
           <View key={item.id} style={styles.card}>
-            <Pressable onPress={() => onOpen(item.id)}>
+            <Pressable testID={`favorite-open-${item.id}`} onPress={() => onOpen(item.id)}>
               <Text style={styles.date}>{item.verse_date}</Text>
               <Text style={styles.text} numberOfLines={2}>
                 {item.verse_text}
               </Text>
               <Text style={styles.reference}>{item.reference}</Text>
             </Pressable>
-            <Pressable onPress={() => void onRemove(item.id)} style={styles.removeBtn}>
+            <Pressable testID={`favorite-remove-${item.id}`} onPress={() => void onRemove(item.id)} style={styles.removeBtn}>
               <Ionicons name="heart-dislike-outline" size={16} color="#9A202F" />
               <Text style={styles.removeText}>{copy.remove}</Text>
             </Pressable>

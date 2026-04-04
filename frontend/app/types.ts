@@ -49,5 +49,6 @@ export interface AuthResponse {
   user: UserProfile;
 }
 
-const typesPlaceholder = {};
-export default typesPlaceholder;
+export default function TypesRoutePlaceholder() {
+  return null;
+}

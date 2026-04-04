@@ -113,4 +113,6 @@ export const api = {
   sendDailyPush: () => request<{ sent_count: number }>("/push/send-daily", { method: "POST" }),
 };
 
-export default api;
+export default function ApiRoutePlaceholder() {
+  return null;
+}

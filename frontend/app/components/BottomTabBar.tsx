@@ -29,6 +29,7 @@ export function BottomTabBar({ activeTab, onChange, labels }: Props) {
         const active = item.key === activeTab;
         return (
           <Pressable
+            testID={`tab-${item.key}`}
             key={item.key}
             onPress={() => onChange(item.key)}
             style={({ pressed }) => [styles.item, active && styles.itemActive, pressed && styles.itemPressed]}

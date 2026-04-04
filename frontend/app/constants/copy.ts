@@ -72,4 +72,6 @@ const te: CopyMap = {
 
 export const getCopy = (language: AppLanguage) => (language === "te" ? te : en);
 
-export default getCopy;
+export default function CopyRoutePlaceholder() {
+  return null;
+}

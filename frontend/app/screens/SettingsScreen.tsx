@@ -38,6 +38,7 @@ export function SettingsScreen({
 
       <SettingBlock label={copy.language}>
         <DualToggle
+          testIDPrefix="settings-language"
           value={settings.default_language}
           left={{ key: "en", label: "EN" }}
           right={{ key: "te", label: "తెలుగు" }}
@@ -47,6 +48,7 @@ export function SettingsScreen({
 
       <SettingBlock label={copy.theme}>
         <DualToggle
+          testIDPrefix="settings-theme"
           value={settings.theme}
           left={{ key: "light", label: copy.light }}
           right={{ key: "dark", label: copy.dark }}
@@ -56,6 +58,7 @@ export function SettingsScreen({
 
       <SettingBlock label={copy.notificationTime}>
         <TextInput
+          testID="settings-notification-time"
           value={settings.notification_time}
           onChangeText={onChangeTime}
           placeholder="06:00"
@@ -67,6 +70,7 @@ export function SettingsScreen({
       <View style={styles.switchRow}>
         <Text style={styles.label}>{copy.notificationEnabled}</Text>
         <Switch
+          testID="settings-notification-switch"
           value={settings.notification_enabled}
           onValueChange={onToggleNotification}
           trackColor={{ false: "#C8D4E8", true: "#7DA8E6" }}
@@ -74,10 +78,10 @@ export function SettingsScreen({
         />
       </View>
 
-      <PrimaryButton label={copy.saveSettings} onPress={onSave} loading={saving} />
-      <GhostButton label={copy.sendTest} onPress={onTestPush} />
-      <GhostButton label={copy.sendDaily} onPress={onDailyPush} />
-      <GhostButton label={copy.logout} onPress={onLogout} danger />
+      <PrimaryButton label={copy.saveSettings} onPress={onSave} loading={saving} testID="settings-save-button" />
+      <GhostButton label={copy.sendTest} onPress={onTestPush} testID="settings-test-push" />
+      <GhostButton label={copy.sendDaily} onPress={onDailyPush} testID="settings-daily-push" />
+      <GhostButton label={copy.logout} onPress={onLogout} danger testID="settings-logout" />
     </ScrollView>
   );
 }
@@ -98,11 +102,13 @@ function DualToggle<T extends string>({
   left,
   right,
   onChange,
+  testIDPrefix,
 }: {
   value: T;
   left: { key: T; label: string };
   right: { key: T; label: string };
   onChange: (value: T) => void;
+  testIDPrefix?: string;
 }) {
   return (
     <View style={styles.dualWrap}>
@@ -110,6 +116,7 @@ function DualToggle<T extends string>({
         const active = item.key === value;
         return (
           <Pressable
+            testID={testIDPrefix ? `${testIDPrefix}-${item.key}` : undefined}
             key={item.key}
             onPress={() => onChange(item.key)}
             style={({ pressed }) => [styles.dualItem, active && styles.dualItemActive, pressed && styles.pressed]}
@@ -122,9 +129,19 @@ function DualToggle<T extends string>({
   );
 }
 
-function PrimaryButton({ label, onPress, loading }: { label: string; onPress: () => Promise<void>; loading?: boolean }) {
+function PrimaryButton({
+  label,
+  onPress,
+  loading,
+  testID,
+}: {
+  label: string;
+  onPress: () => Promise<void>;
+  loading?: boolean;
+  testID?: string;
+}) {
   return (
-    <Pressable onPress={() => void onPress()} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
+    <Pressable testID={testID} onPress={() => void onPress()} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
       <Text style={styles.primaryText}>{loading ? "Saving..." : label}</Text>
     </Pressable>
   );
@@ -134,13 +151,16 @@ function GhostButton({
   label,
   onPress,
   danger,
+  testID,
 }: {
   label: string;
   onPress: () => Promise<void>;
   danger?: boolean;
+  testID?: string;
 }) {
   return (
     <Pressable
+      testID={testID}
       onPress={() => void onPress()}
       style={({ pressed }) => [styles.ghost, danger && styles.ghostDanger, pressed && styles.pressed]}
     >

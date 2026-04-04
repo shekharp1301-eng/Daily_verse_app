@@ -45,6 +45,7 @@ export function AuthScreen({ loading, error, onSignIn, onSignUp }: Props) {
 
           {!isLogin && (
             <TextInput
+              testID="auth-name-input"
               value={name}
               onChangeText={setName}
               placeholder="Name"
@@ -54,6 +55,7 @@ export function AuthScreen({ loading, error, onSignIn, onSignUp }: Props) {
           )}
 
           <TextInput
+            testID="auth-email-input"
             value={email}
             onChangeText={setEmail}
             placeholder="Email"
@@ -64,6 +66,7 @@ export function AuthScreen({ loading, error, onSignIn, onSignUp }: Props) {
           />
 
           <TextInput
+            testID="auth-password-input"
             value={password}
             onChangeText={setPassword}
             placeholder="Password"
@@ -75,6 +78,7 @@ export function AuthScreen({ loading, error, onSignIn, onSignUp }: Props) {
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Pressable
+            testID="auth-submit-button"
             onPress={submit}
             disabled={loading}
             style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed, loading && styles.disabled]}
@@ -82,7 +86,7 @@ export function AuthScreen({ loading, error, onSignIn, onSignUp }: Props) {
             <Text style={styles.primaryText}>{loading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}</Text>
           </Pressable>
 
-          <Pressable onPress={() => setIsLogin((prev) => !prev)} style={styles.switchRow}>
+          <Pressable testID="auth-switch-mode" onPress={() => setIsLogin((prev) => !prev)} style={styles.switchRow}>
             <Text style={styles.switchText}>
               {isLogin ? "New here? Create account" : "Already have an account? Sign in"}
             </Text>
