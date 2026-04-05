@@ -59,6 +59,12 @@ Build a clean, modern, spiritual mobile app that delivers a daily God’s Word e
   - Backend login now returns clear `400` message for invalid/blank email instead of noisy validation failures.
 - Re-tested login via API and preview flow with demo credentials successfully.
 
+### 2026-04-04 (Share Image Upgrade)
+- Upgraded Share action to generate devotional **image cards** (not text-only share).
+- Share card now includes: background image, verse, explanation, today’s message, prayer, reference, date, and small app branding.
+- Added two export options from one tap: **Portrait** and **Square**.
+- Long content now auto-trims with ellipsis for clean visual balance.
+
 ## Remaining Backlog
 ### P0 (Must complete next)
 - Harden Expo preview stability under intermittent tunnel conditions (operational reliability).

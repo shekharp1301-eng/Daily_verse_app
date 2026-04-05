@@ -1,6 +1,11 @@
+import { useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import * as Sharing from "expo-sharing";
+import { captureRef } from "react-native-view-shot";
+import { Alert, ImageBackground, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { getCopy } from "../constants/copy";
+import { VERSE_BG_IMAGE } from "../constants/images";
 import { AppLanguage, VerseCardData } from "../types";
 import { VerseCard } from "../components/VerseCard";
 
@@ -26,13 +31,46 @@ export function HomeScreen({
   onOpenSettings,
 }: Props) {
   const copy = getCopy(language);
+  const portraitShareRef = useRef<View>(null);
+  const squareShareRef = useRef<View>(null);
 
-  const onShare = async () => {
+  const trimText = (value: string, maxLength: number) => {
+    if (value.length <= maxLength) return value;
+    return `${value.slice(0, maxLength).trimEnd()}...`;
+  };
+
+  const shareCard = async (size: "portrait" | "square") => {
     if (!verse) return;
+
+    try {
+      const targetRef = size === "portrait" ? portraitShareRef : squareShareRef;
+      const uri = await captureRef(targetRef, {
+        format: "png",
+        quality: 1,
+        result: "tmpfile",
+      });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { dialogTitle: "Share Daily Verse" });
+        return;
+      }
+    } catch (error) {
+      console.warn("Image share failed:", error);
+    }
+
     await Share.share({
       title: "Daily Verse",
       message: `${verse.verse_text}\n\n${verse.reference}\n\n${verse.message}`,
     });
+  };
+
+  const onShare = async () => {
+    if (!verse) return;
+    Alert.alert("Share as Image", "Choose devotional card size", [
+      { text: "Portrait", onPress: () => void shareCard("portrait") },
+      { text: "Square", onPress: () => void shareCard("square") },
+      { text: "Cancel", style: "cancel" },
+    ]);
   };
 
   const today = new Date().toLocaleDateString(language === "te" ? "te-IN" : "en-US", {
@@ -41,74 +79,176 @@ export function HomeScreen({
     day: "numeric",
   });
 
+  const shareVerse = verse
+    ? {
+        verseText: trimText(verse.verse_text, 260),
+        explanation: trimText(verse.explanation, 180),
+        message: trimText(verse.message, 140),
+        prayer: trimText(verse.prayer, 180),
+      }
+    : null;
+
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.date}>{today}</Text>
-          <View style={styles.streakRow}>
-            <Ionicons name="flame-outline" size={14} color="#A86C18" />
-            <Text style={styles.streakLabel}>{copy.streak}: {streak}</Text>
+    <>
+      <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.date}>{today}</Text>
+            <View style={styles.streakRow}>
+              <Ionicons name="flame-outline" size={14} color="#A86C18" />
+              <Text style={styles.streakLabel}>{copy.streak}: {streak}</Text>
+            </View>
+          </View>
+          <View style={styles.rightHeader}>
+            <View style={styles.toggleRow}>
+              {(["en", "te"] as AppLanguage[]).map((item) => {
+                const active = language === item;
+                return (
+                  <Pressable
+                    testID={`language-toggle-${item}`}
+                    key={item}
+                    onPress={() => onLanguageChange(item)}
+                    style={[styles.togglePill, active && styles.toggleActive]}
+                  >
+                    <Text style={[styles.toggleText, active && styles.toggleTextActive]}>{item.toUpperCase()}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Pressable testID="open-settings-button" onPress={onOpenSettings} style={styles.settingsBtn}>
+              <Ionicons name="settings-outline" size={20} color="#1F3C63" />
+            </Pressable>
           </View>
         </View>
-        <View style={styles.rightHeader}>
-          <View style={styles.toggleRow}>
-            {(["en", "te"] as AppLanguage[]).map((item) => {
-              const active = language === item;
-              return (
-                <Pressable
-                  testID={`language-toggle-${item}`}
-                  key={item}
-                  onPress={() => onLanguageChange(item)}
-                  style={[styles.togglePill, active && styles.toggleActive]}
-                >
-                  <Text style={[styles.toggleText, active && styles.toggleTextActive]}>{item.toUpperCase()}</Text>
-                </Pressable>
-              );
-            })}
+
+        {verse ? (
+          <>
+            <VerseCard verse={verse} />
+
+            <Section title={copy.explanation} body={verse.explanation} />
+            <Section title={copy.message} body={verse.message} highlighted />
+            <Section title={copy.prayer} body={verse.prayer} italic />
+
+            <View style={styles.actionRow}>
+              <CircleAction
+                label={copy.favorite}
+                icon={verse.is_favorite ? "heart" : "heart-outline"}
+                onPress={onFavorite}
+                active={verse.is_favorite}
+                testID="home-favorite-button"
+              />
+              <CircleAction label={copy.share} icon="share-social-outline" onPress={onShare} testID="home-share-button" />
+              <CircleAction
+                label={copy.refresh}
+                icon="refresh-outline"
+                onPress={onRefresh}
+                loading={isRefreshing}
+                testID="home-refresh-button"
+              />
+            </View>
+          </>
+        ) : (
+          <View style={styles.loadingWrap}>
+            <Text style={styles.loadingText}>Loading today&apos;s verse...</Text>
           </View>
-          <Pressable testID="open-settings-button" onPress={onOpenSettings} style={styles.settingsBtn}>
-            <Ionicons name="settings-outline" size={20} color="#1F3C63" />
-          </Pressable>
-        </View>
-      </View>
+        )}
+      </ScrollView>
 
-      {verse ? (
-        <>
-          <VerseCard verse={verse} />
-
-          <Section title={copy.explanation} body={verse.explanation} />
-          <Section title={copy.message} body={verse.message} highlighted />
-          <Section title={copy.prayer} body={verse.prayer} italic />
-
-          <View style={styles.actionRow}>
-            <CircleAction
-              label={copy.favorite}
-              icon={verse.is_favorite ? "heart" : "heart-outline"}
-              onPress={onFavorite}
-              active={verse.is_favorite}
-              testID="home-favorite-button"
+      {verse && shareVerse ? (
+        <View style={styles.hiddenRenderArea} pointerEvents="none">
+          <View ref={portraitShareRef} style={styles.shareCanvasPortrait}>
+            <ShareCardTemplate
+              verse={verse}
+              verseText={shareVerse.verseText}
+              explanation={shareVerse.explanation}
+              message={shareVerse.message}
+              prayer={shareVerse.prayer}
+              language={language}
+              today={today}
+              square={false}
             />
-            <CircleAction label={copy.share} icon="share-social-outline" onPress={onShare} testID="home-share-button" />
-            <CircleAction
-              label={copy.refresh}
-              icon="refresh-outline"
-              onPress={onRefresh}
-              loading={isRefreshing}
-              testID="home-refresh-button"
+          </View>
+
+          <View ref={squareShareRef} style={styles.shareCanvasSquare}>
+            <ShareCardTemplate
+              verse={verse}
+              verseText={shareVerse.verseText}
+              explanation={shareVerse.explanation}
+              message={shareVerse.message}
+              prayer={shareVerse.prayer}
+              language={language}
+              today={today}
+              square
             />
           </View>
-        </>
-      ) : (
-        <View style={styles.loadingWrap}>
-          <Text style={styles.loadingText}>Loading today&apos;s verse...</Text>
         </View>
-      )}
-    </ScrollView>
+      ) : null}
+    </>
   );
 }
 
 export default HomeScreen;
+
+function ShareCardTemplate({
+  verse,
+  verseText,
+  explanation,
+  message,
+  prayer,
+  language,
+  today,
+  square,
+}: {
+  verse: VerseCardData;
+  verseText: string;
+  explanation: string;
+  message: string;
+  prayer: string;
+  language: AppLanguage;
+  today: string;
+  square: boolean;
+}) {
+  const copy = getCopy(language);
+
+  return (
+    <ImageBackground source={{ uri: VERSE_BG_IMAGE }} resizeMode="cover" style={styles.shareBg}>
+      <LinearGradient
+        colors={["rgba(7,16,30,0.25)", "rgba(7,16,30,0.88)"]}
+        style={[styles.shareOverlay, square && styles.shareOverlaySquare]}
+      >
+        <View style={styles.shareTopRow}>
+          <View style={styles.shareBrandPill}>
+            <Ionicons name="sparkles-outline" size={14} color="#FFD88A" />
+            <Text style={styles.shareBrandText}>Daily Verse</Text>
+          </View>
+          <Text style={styles.shareDate}>{today}</Text>
+        </View>
+
+        <View style={[styles.shareVerseBlock, square && styles.shareVerseBlockSquare]}>
+          <Text style={[styles.shareVerseText, square && styles.shareVerseTextSquare]}>{verseText}</Text>
+          <Text style={styles.shareReference}>{verse.reference}</Text>
+        </View>
+
+        <View style={styles.shareSectionCard}>
+          <Text style={styles.shareSectionTitle}>{copy.explanation}</Text>
+          <Text style={styles.shareSectionBody}>{explanation}</Text>
+        </View>
+
+        <View style={styles.shareSectionCardWarm}>
+          <Text style={styles.shareSectionTitle}>{copy.message}</Text>
+          <Text style={styles.shareSectionBody}>{message}</Text>
+        </View>
+
+        <View style={styles.shareSectionCard}>
+          <Text style={styles.shareSectionTitle}>{copy.prayer}</Text>
+          <Text style={[styles.shareSectionBody, styles.sharePrayer]}>{prayer}</Text>
+        </View>
+
+        <Text style={styles.shareFooter}>Daily Verse • Today&apos;s God&apos;s Word</Text>
+      </LinearGradient>
+    </ImageBackground>
+  );
+}
 
 function Section({
   title,
@@ -219,6 +359,118 @@ const styles = StyleSheet.create({
   actionBtnActive: { backgroundColor: "#FEECEE" },
   actionText: { fontSize: 12, color: "#2D4264", fontWeight: "600", textAlign: "center" },
   actionPressed: { opacity: 0.75, transform: [{ scale: 0.97 }] },
+  hiddenRenderArea: {
+    position: "absolute",
+    left: -6000,
+    top: -6000,
+  },
+  shareCanvasPortrait: {
+    width: 900,
+    height: 1600,
+  },
+  shareCanvasSquare: {
+    width: 900,
+    height: 900,
+    marginTop: 20,
+  },
+  shareBg: {
+    width: "100%",
+    height: "100%",
+  },
+  shareOverlay: {
+    flex: 1,
+    padding: 56,
+    gap: 20,
+    justifyContent: "flex-start",
+  },
+  shareOverlaySquare: {
+    padding: 44,
+    gap: 14,
+  },
+  shareTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  shareBrandPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,216,138,0.65)",
+    backgroundColor: "rgba(21,33,55,0.66)",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  shareBrandText: {
+    color: "#FFE4A9",
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  shareDate: {
+    color: "#DFE9FF",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  shareVerseBlock: {
+    marginTop: 16,
+    gap: 12,
+  },
+  shareVerseBlockSquare: {
+    marginTop: 8,
+  },
+  shareVerseText: {
+    color: "#FFFFFF",
+    fontSize: 50,
+    lineHeight: 68,
+    fontWeight: "700",
+  },
+  shareVerseTextSquare: {
+    fontSize: 42,
+    lineHeight: 56,
+  },
+  shareReference: {
+    color: "#DFE9FF",
+    fontSize: 24,
+    fontStyle: "italic",
+  },
+  shareSectionCard: {
+    borderRadius: 22,
+    backgroundColor: "rgba(18,31,52,0.68)",
+    borderWidth: 1,
+    borderColor: "rgba(209,226,255,0.22)",
+    padding: 18,
+    gap: 10,
+  },
+  shareSectionCardWarm: {
+    borderRadius: 22,
+    backgroundColor: "rgba(180,126,38,0.23)",
+    borderWidth: 1,
+    borderColor: "rgba(255,217,152,0.52)",
+    padding: 18,
+    gap: 10,
+  },
+  shareSectionTitle: {
+    color: "#FFF5DD",
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  shareSectionBody: {
+    color: "#EFF5FF",
+    fontSize: 24,
+    lineHeight: 34,
+  },
+  sharePrayer: {
+    fontStyle: "italic",
+  },
+  shareFooter: {
+    marginTop: "auto",
+    textAlign: "center",
+    color: "#D5E4FF",
+    fontSize: 20,
+    fontWeight: "600",
+  },
   loadingWrap: {
     borderRadius: 18,
     padding: 20,
