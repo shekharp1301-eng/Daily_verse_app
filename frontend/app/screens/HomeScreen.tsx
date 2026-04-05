@@ -2,8 +2,8 @@ import { useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Sharing from "expo-sharing";
-import { captureRef } from "react-native-view-shot";
-import { Alert, ImageBackground, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import ViewShot from "react-native-view-shot";
+import { Alert, ImageBackground, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { getCopy } from "../constants/copy";
 import { VERSE_BG_IMAGE } from "../constants/images";
 import { AppLanguage, VerseCardData } from "../types";
@@ -30,9 +30,12 @@ export function HomeScreen({
   onRefresh,
   onOpenSettings,
 }: Props) {
+  type ShareShotRef = { capture: () => Promise<string> };
+
   const copy = getCopy(language);
-  const portraitShareRef = useRef<View>(null);
-  const squareShareRef = useRef<View>(null);
+  const portraitShareRef = useRef<ShareShotRef | null>(null);
+  const squareShareRef = useRef<ShareShotRef | null>(null);
+  const shareResultType: "tmpfile" | "data-uri" = Platform.OS === "web" ? "data-uri" : "tmpfile";
 
   const trimText = (value: string, maxLength: number) => {
     if (value.length <= maxLength) return value;
@@ -43,25 +46,41 @@ export function HomeScreen({
     if (!verse) return;
 
     try {
-      const targetRef = size === "portrait" ? portraitShareRef : squareShareRef;
-      const uri = await captureRef(targetRef, {
-        format: "png",
-        quality: 1,
-        result: "tmpfile",
-      });
+      const targetRef = size === "portrait" ? portraitShareRef.current : squareShareRef.current;
+      if (!targetRef) {
+        throw new Error("Share template not ready");
+      }
+
+      const uri = await targetRef.capture();
+
+      if (Platform.OS === "web" && uri.startsWith("data:image")) {
+        const doc = globalThis.document;
+        if (doc) {
+          const link = doc.createElement("a");
+          link.href = uri;
+          link.download = `daily-verse-${size}.png`;
+          doc.body.appendChild(link);
+          link.click();
+          doc.body.removeChild(link);
+          Alert.alert("Image downloaded", "Your devotional image is ready to share.");
+          return;
+        }
+      }
 
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, { dialogTitle: "Share Daily Verse" });
         return;
       }
+
+      await Share.share({
+        title: "Daily Verse",
+        url: uri,
+      });
+      return;
     } catch (error) {
       console.warn("Image share failed:", error);
+      Alert.alert("Image share failed", "Couldn’t generate share image. Please try again.");
     }
-
-    await Share.share({
-      title: "Daily Verse",
-      message: `${verse.verse_text}\n\n${verse.reference}\n\n${verse.message}`,
-    });
   };
 
   const onShare = async () => {
@@ -156,7 +175,12 @@ export function HomeScreen({
 
       {verse && shareVerse ? (
         <View style={styles.hiddenRenderArea} pointerEvents="none">
-          <View ref={portraitShareRef} style={styles.shareCanvasPortrait}>
+          <ViewShot
+            ref={portraitShareRef}
+            style={styles.shareCanvasPortrait}
+            options={{ format: "png", quality: 1, result: shareResultType }}
+            collapsable={false}
+          >
             <ShareCardTemplate
               verse={verse}
               verseText={shareVerse.verseText}
@@ -167,9 +191,14 @@ export function HomeScreen({
               today={today}
               square={false}
             />
-          </View>
+          </ViewShot>
 
-          <View ref={squareShareRef} style={styles.shareCanvasSquare}>
+          <ViewShot
+            ref={squareShareRef}
+            style={styles.shareCanvasSquare}
+            options={{ format: "png", quality: 1, result: shareResultType }}
+            collapsable={false}
+          >
             <ShareCardTemplate
               verse={verse}
               verseText={shareVerse.verseText}
@@ -180,7 +209,7 @@ export function HomeScreen({
               today={today}
               square
             />
-          </View>
+          </ViewShot>
         </View>
       ) : null}
     </>
